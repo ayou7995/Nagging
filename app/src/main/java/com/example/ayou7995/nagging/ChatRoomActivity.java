@@ -59,6 +59,7 @@ public class ChatRoomActivity extends AppCompatActivity {
     private String subject_name = "";
     private String user_state = "";
     private String message = "";
+    private String jsonStr = "";
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -92,6 +93,13 @@ public class ChatRoomActivity extends AppCompatActivity {
                 if(message.compareTo("")!=0){
                     // Todo
                     Log.i(Tag, "Send button onClicked");
+                    ChatMessage chatMessage = new ChatMessage();
+                    chatMessage.setMessage(message);
+                    chatMessage.setLeft(false);
+                    msg_list.add(chatMessage);
+                    msg_Adapter.notifyDataSetChanged();
+                    msg_et.setText("");
+                    msg_et.clearFocus();
                     setJsonObject(user_name, subject_name, "nag", message);
                     new ChatRoomTask().execute(urlString);
                 }
@@ -105,11 +113,19 @@ public class ChatRoomActivity extends AppCompatActivity {
                 msg_Adapter.notifyDataSetChanged(); */
             }
         });
-
         // Continue to send connect message to server
         handler = new Handler();
         handler.removeCallbacks(sendData);
-        handler.postDelayed(sendData, 1000);
+        handler.postDelayed(sendData, 3000);
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if(checkNetwork()) {
+            handler.removeCallbacks(sendData);
+            handler.postDelayed(sendData, 3000);
+        }
     }
 
     @Override
@@ -143,7 +159,7 @@ public class ChatRoomActivity extends AppCompatActivity {
                 setJsonObject(user_name, subject_name, "wait", "");
                 new ChatRoomTask().execute(urlString);
             }
-            handler.postDelayed(this,1000);
+            handler.postDelayed(this,3000);
         }
     };
 
@@ -171,6 +187,13 @@ public class ChatRoomActivity extends AppCompatActivity {
                 Log.i(Tag,"Unable to connect to server.");
             }
             return null;
+        }
+
+        @Override
+        protected void onPostExecute(String s) {
+            super.onPostExecute(s);
+            decodeJSON(jsonStr);
+            msg_Adapter.notifyDataSetChanged();
         }
     }
 
@@ -212,8 +235,7 @@ public class ChatRoomActivity extends AppCompatActivity {
             Log.d(Tag, "The response is: " + response);
 
             // Decode jsonString ...
-            decodeJSON(sb.toString());
-
+            jsonStr = sb.toString();
             return "Success";
         } catch (MalformedURLException e) {
             Log.i(Tag, "bAD");
@@ -262,12 +284,13 @@ public class ChatRoomActivity extends AppCompatActivity {
             if(convertView==null) {
                 Log.d(Tag, "ConvertView == null");
                 viewHolder = new ViewHolder();
-                if (chat_msg.left) {
-                    convertView = inflater.inflate(R.layout.right, parent, false);
-                } else {
+                if (chat_msg.getLeft()) {
                     convertView = inflater.inflate(R.layout.left, parent, false);
+                    viewHolder.msgText = (TextView) convertView.findViewById(R.id.msgl);
+                } else {
+                    convertView = inflater.inflate(R.layout.right, parent, false);
+                    viewHolder.msgText = (TextView) convertView.findViewById(R.id.msgr);
                 }
-                viewHolder.msgText = (TextView) convertView.findViewById(R.id.msgr);
                 convertView.setTag(viewHolder);
             } else {
                 Log.d(Tag, "ConvertView != null");
@@ -288,23 +311,44 @@ public class ChatRoomActivity extends AppCompatActivity {
         JSONObject jsonResponse;
         Log.i(Tag,jsonStr);
         try {
-            // List<String> msgList = new ArrayList<>();
             jsonResponse = new JSONObject(jsonStr);
-            JSONArray msgArray = jsonResponse.getJSONArray("msg_list"); // msg_list = [];
-            for(int i=0 ; i<msgArray.length() ; ++i){
-                JSONObject jsonObject = msgArray.getJSONObject(i);
-                ChatMessage chatMessage = new ChatMessage();
-                if(jsonObject.getString("sender").compareTo(user_name)==0) {
-                    chatMessage.setLeft(false);
-                } else {
-                    chatMessage.setLeft(true);
+            String empty;
+            JSONArray msgList = new JSONArray();
+            String state = jsonResponse.getString("state");
+            if(jsonResponse.get("chatlist") instanceof JSONArray) {
+                msgList = jsonResponse.getJSONArray("chatlist"); // chatlist = [];
+            } else {
+                empty = jsonResponse.getString("chatlist");
+            }
+            if(state.compareTo("continue")==0) {
+                Log.i(Tag,"State = continue");
+                if(msgList!=null) {
+                    for (int i = 0; i < msgList.length(); ++i) {
+                        JSONObject jsonObject = msgList.getJSONObject(i);
+                        ChatMessage chatMessage = new ChatMessage();
+                        if (jsonObject.getString("Sender").compareTo(user_name) == 0) {
+                            chatMessage.setLeft(false);
+                        } else {
+                            chatMessage.setLeft(true);
+                        }
+                        chatMessage.setMessage(jsonObject.getString("Message"));
+                        msg_list.add(chatMessage);
+                    }
                 }
-                chatMessage.setMessage(jsonObject.getString("message"));
-                msg_list.add(chatMessage);
-                msg_Adapter.notifyDataSetChanged();
+            } else if (state.compareTo("leave")==0) {
+                Log.i(Tag,"State = leave");
+                Intent intent = new Intent();
+                intent.setClass(ChatRoomActivity.this,LobbyActivity.class);
+                Bundle bundle = new Bundle();
+                bundle.putString("user_name", user_name);
+                intent.putExtras(bundle);
+                intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+                startActivity(intent);
+                finish();
             }
         } catch (JSONException e) {
             e.printStackTrace();
+            Log.i(Tag, "Unable to decode JSON string");
         }
     }
 

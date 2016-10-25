@@ -168,7 +168,6 @@ public class MainActivity extends AppCompatActivity {
                 bundle.putString("user_name", name);
                 intent.putExtras(bundle);
                 startActivity(intent);
-                finish();
             } else if (stream.compareTo("Wrong Password")==0) {
                 Toast.makeText(MainActivity.this, "Wrong Password.", Toast.LENGTH_SHORT).show();
             } else if (stream.compareTo("Unregistered ID")==0) {

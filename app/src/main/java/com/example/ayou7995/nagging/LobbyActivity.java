@@ -31,6 +31,7 @@ import java.io.OutputStreamWriter;
 import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.security.KeyStore;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -55,6 +56,8 @@ public class LobbyActivity extends AppCompatActivity {
     // private String user_nag_request = "";
     private String stream = "";
     private JSONObject jsonObject;
+
+    boolean toNag = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -86,24 +89,29 @@ public class LobbyActivity extends AppCompatActivity {
         listview.setOnItemClickListener(new AdapterView.OnItemClickListener() {
             @Override
             public void onItemClick(AdapterView<?> adapterView, View view, int i, long l) {
-                jump2ChatRoom(user_name, ((LobbyRow)adapterView.getItemAtPosition(i)).get_name());
+                // jump2ChatRoom(user_name, ((LobbyRow)adapterView.getItemAtPosition(i)).get_name());
+                String connectSubject = ((LobbyRow)adapterView.getItemAtPosition(i)).get_name();
+                if(checkNetwork()) {
+                    setJsonObject(user_name, "online", connectSubject);
+                    new LobbyTask().execute(urlString);
+                }
             }
         });
 
         // Continue to send jsonObject to server
         handler = new Handler();
         handler.removeCallbacks(sendData);
-        handler.postDelayed(sendData, 1000);
+        handler.postDelayed(sendData, 5000);
     }
 
     View.OnClickListener clickHandler = new View.OnClickListener() {
         @Override
         public void onClick(View view) {
             switch(view.getId()){
-                case R.id.refresh_btn:
+                /*case R.id.refresh_btn:
                     lobbyAdapter.notifyDataSetChanged();
-                    break;
-                case R.id.initialize_btn:
+                    break;*/
+                /*case R.id.initialize_btn:
                     for(int i=0 ; i<10 ; ++i) {
                         LobbyRow lobbyRow = new LobbyRow();
                         lobbyRow.set_name("Jonathan");
@@ -112,23 +120,34 @@ public class LobbyActivity extends AppCompatActivity {
                         lobbyList.add(lobbyRow);
                     }
                     lobbyAdapter.notifyDataSetChanged();
-                    break;
-                case R.id.chat_btn:
+                    break;*/
+                /*case R.id.chat_btn:
                     Intent intent = new Intent();
                     intent.setClass(LobbyActivity.this, ChatRoomActivity.class);
                     startActivity(intent);
                     finish();
-                    break;
+                    break;*/
             }
         }
     };
 
     @Override
+    protected void onResume() {
+        super.onResume();
+        toNag = false;
+        if(checkNetwork()) {
+            handler.removeCallbacks(sendData);
+            handler.postDelayed(sendData, 5000);
+        }
+    }
+    @Override
     protected void onPause() {
         super.onPause();
         if(checkNetwork()) {
-            setJsonObject(user_name, "leave", "");
-            new LobbyTask().execute(urlString);
+            if(!toNag) {
+                setJsonObject(user_name, "leave", "");
+                new LobbyTask().execute(urlString);
+            }
         }
         handler.removeCallbacks(sendData);
     }
@@ -154,7 +173,7 @@ public class LobbyActivity extends AppCompatActivity {
                 setJsonObject(user_name, "online", "");
                 new LobbyTask().execute(urlString);
             }
-            handler.postDelayed(this,1000);
+            handler.postDelayed(this,5000);
         }
     };
 
@@ -181,6 +200,12 @@ public class LobbyActivity extends AppCompatActivity {
                 Log.i(Tag,"Unable to connect to server.");
             }
             return null;
+        }
+
+        @Override
+        protected void onPostExecute(String s) {
+            super.onPostExecute(s);
+            lobbyAdapter.notifyDataSetChanged();
         }
     }
 
@@ -296,8 +321,9 @@ public class LobbyActivity extends AppCompatActivity {
     }
 
     private void jump2ChatRoom(String user1, String user2){
-        Log.i(Tag,"Start to nag with "+user2);
+        Log.i(Tag,"Username (" + user1 + ") starts to nag with "+user2);
         handler.removeCallbacks(sendData);
+        toNag = true;
         Intent intent = new Intent();
         intent.setClass(LobbyActivity.this, ChatRoomActivity.class);
         Bundle bundle = new Bundle();
@@ -305,7 +331,6 @@ public class LobbyActivity extends AppCompatActivity {
         bundle.putString("subject_name", user2);
         intent.putExtras(bundle);
         startActivity(intent);
-        finish();
     }
 
     private void decodeJSON(String jsonStr) {
@@ -313,28 +338,40 @@ public class LobbyActivity extends AppCompatActivity {
         Log.i(Tag,jsonStr);
         try {
             // List<String> msgList = new ArrayList<>();
+            String empty;
             jsonResponse = new JSONObject(jsonStr);
+            JSONArray jsonList = new JSONArray();
             String msgState = jsonResponse.getString("message");
-            JSONArray jsonList = jsonResponse.getJSONArray("msg_list"); // msg_list = [];
+            if(jsonResponse.get("userlist") instanceof JSONArray) {
+                jsonList = jsonResponse.getJSONArray("userlist"); // msg_list = [];
+            } else {
+                empty = jsonResponse.getString("userlist");
+            }
             if(msgState.compareTo("unchange")==0) {
-                lobbyList.clear();
-                for(int i=0 ; i<jsonList.length() ; ++i){
-                    JSONObject jsonObject = jsonList.getJSONObject(i);
-                    LobbyRow lobbyRow = new LobbyRow();
-                    lobbyRow.set_name(jsonObject.getString("Name"));
-                    lobbyRow.set_subject(jsonObject.getString("Guest"));
-                    lobbyRow.set_state(jsonObject.getString("State"));
-                    lobbyList.add(lobbyRow);
+                if(jsonList!=null) {
+                    lobbyList.clear();
+                    for (int i = 0; i < jsonList.length(); ++i) {
+                        JSONObject jsonObject = jsonList.getJSONObject(i);
+                        LobbyRow lobbyRow = new LobbyRow();
+                        lobbyRow.set_name(jsonObject.getString("Name"));
+                        lobbyRow.set_subject(jsonObject.getString("Guest"));
+                        lobbyRow.set_state(jsonObject.getString("State"));
+                        lobbyList.add(lobbyRow);
+                    }
                 }
-                lobbyAdapter.notifyDataSetChanged();
             } else if (msgState.compareTo("connect")==0) {
-                JSONObject jsonObject = jsonList.getJSONObject(0);
-                if(jsonObject.getString("Name").compareTo(user_name)==0) {
-                    jump2ChatRoom(user_name, jsonObject.getString("Guest"));
+                if(jsonList!=null){
+                    JSONObject jsonObject = jsonList.getJSONObject(0);
+                    if(jsonObject.getString("Guest").compareTo(user_name)==0) {
+                        jump2ChatRoom(user_name, jsonObject.getString("Name"));
+                    }
                 }
+            } else {
+                Log.i(Tag, "msgState = " + msgState);
             }
 
         } catch (JSONException e) {
+            Log.i(Tag, "Unable to decode JSON string");
             e.printStackTrace();
         }
     }
