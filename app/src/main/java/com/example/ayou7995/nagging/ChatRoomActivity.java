@@ -278,10 +278,16 @@ public class ChatRoomActivity extends AppCompatActivity {
             Log.i(Tag, "LobbyAdapter.getView Called. Position: " + String.valueOf(position));
             // LayoutInflater inflater = (LayoutInflater) getApplication().getSystemService(Context.LAYOUT_INFLATER_SERVICE);
 
-            ViewHolder viewHolder;
+            ViewHolder viewHolder = new ViewHolder();
             ChatMessage chat_msg = (ChatMessage) getItem(position);
-
-            if(convertView==null) {
+            if (chat_msg.getLeft()) {
+                convertView = inflater.inflate(R.layout.left, parent, false);
+                viewHolder.msgText = (TextView) convertView.findViewById(R.id.msgl);
+            } else {
+                convertView = inflater.inflate(R.layout.right, parent, false);
+                viewHolder.msgText = (TextView) convertView.findViewById(R.id.msgr);
+            }
+            /* if(convertView==null) {
                 Log.d(Tag, "ConvertView == null");
                 viewHolder = new ViewHolder();
                 if (chat_msg.getLeft()) {
@@ -295,8 +301,10 @@ public class ChatRoomActivity extends AppCompatActivity {
             } else {
                 Log.d(Tag, "ConvertView != null");
                 viewHolder = (ViewHolder) convertView.getTag();
-            }
+            } */
 
+            Log.d(Tag, String.valueOf(chat_msg.getLeft()));
+            Log.d(Tag, chat_msg.getMessage());
             viewHolder.msgText.setText(chat_msg.message);
 
             return convertView;

@@ -103,7 +103,18 @@ public class MainActivity extends AppCompatActivity {
         // onPostExecute displays the results of the AsyncTask.
         @Override
         protected void onPostExecute(String result) {
-            showText.setText(stream);
+            if(stream.compareTo("Successfully Login")==0) {
+                Intent intent = new Intent();
+                intent.setClass(MainActivity.this, LobbyActivity.class);
+                Bundle bundle = new Bundle();
+                bundle.putString("user_name", name);
+                intent.putExtras(bundle);
+                startActivity(intent);
+            } else if (stream.compareTo("Wrong Password")==0) {
+                Toast.makeText(MainActivity.this, "Wrong Password.", Toast.LENGTH_SHORT).show();
+            } else if (stream.compareTo("Unregistered ID")==0) {
+                Toast.makeText(MainActivity.this, "Name don't exist. Sign up for one?", Toast.LENGTH_SHORT).show();
+            }
         }
     }
 
@@ -160,19 +171,6 @@ public class MainActivity extends AppCompatActivity {
 
             int response = conn.getResponseCode();
             Log.d(Tag, "The response is: " + response);
-
-            if(stream.compareTo("Successfully Login")==0) {
-                Intent intent = new Intent();
-                intent.setClass(MainActivity.this, LobbyActivity.class);
-                Bundle bundle = new Bundle();
-                bundle.putString("user_name", name);
-                intent.putExtras(bundle);
-                startActivity(intent);
-            } else if (stream.compareTo("Wrong Password")==0) {
-                Toast.makeText(MainActivity.this, "Wrong Password.", Toast.LENGTH_SHORT).show();
-            } else if (stream.compareTo("Unregistered ID")==0) {
-                Toast.makeText(MainActivity.this, "Name don't exist. Sign up for one?", Toast.LENGTH_SHORT).show();
-            }
 
             return "Success";
         } catch (MalformedURLException e) {
